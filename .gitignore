@@ -1,0 +1,22 @@
+# Python / backend
+backend/.venv/
+backend/__pycache__/
+**/__pycache__/
+*.pyc
+backend/data/*.csv
+backend/data/*.db
+backend/app/models/artifacts/*.joblib
+backend/app/models/artifacts/*.pt
+backend/app/models/artifacts/*.json
+.env
+
+# Node / frontend
+frontend/node_modules/
+frontend/.next/
+frontend/out/
+
+# Editors / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
