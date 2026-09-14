@@ -3,7 +3,9 @@
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 
+from app.data import fetch_crypto, fetch_crypto_coingecko, fetch_crypto_yahoo, fetch_fx, fetch_gold
 from app.data.loader import SYMBOLS, load_prices
+from app.models import train_baseline, train_lstm
 from app.models.predict import MODEL_NAMES, forecast
 
 app = FastAPI(title="Price Oracle API")
@@ -38,7 +40,10 @@ def health():
 @app.get("/history/{symbol}")
 def history(symbol: str, days: int = 90):
     symbol = _validate_symbol(symbol)
-    df = load_prices(symbol).tail(days)
+    try:
+        df = load_prices(symbol).tail(days)
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
     return {
         "symbol": symbol,
         "history": [
@@ -61,3 +66,60 @@ def predict(symbol: str, model: str = "random_forest", horizon: int = 7):
         raise HTTPException(status_code=503, detail=str(exc)) from exc
 
     return {"symbol": symbol, "model": model, "horizon": horizon, "predictions": predictions}
+
+
+@app.post("/data/refresh")
+def refresh_data():
+    try:
+        for symbol in fetch_crypto.TRADING_PAIRS:
+            fetch_crypto.save_coin_history(symbol)
+        fetch_gold.save_gold_history()
+        train_baseline.main()
+        train_lstm.main()
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail=f"Data refresh failed: {exc}") from exc
+    return {"status": "ok"}
+
+
+@app.post("/data/refresh-gold-price")
+def refresh_gold_price():
+    try:
+        result = fetch_gold.save_goldapi_history()
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail=f"GoldAPI refresh failed: {exc}") from exc
+    return {"status": "ok", **result}
+
+
+@app.post("/data/refresh-crypto-coingecko")
+def refresh_crypto_coingecko():
+    try:
+        latest = {}
+        for symbol in fetch_crypto_coingecko.COIN_IDS:
+            df = fetch_crypto_coingecko.save_coin_history(symbol)
+            last = df.iloc[-1]
+            latest[symbol] = {"date": str(last["date"]), "price": float(last["price"])}
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail=f"CoinGecko refresh failed: {exc}") from exc
+    return {"status": "ok", "latest": latest}
+
+
+@app.post("/data/refresh-crypto-yahoo")
+def refresh_crypto_yahoo():
+    try:
+        latest = {}
+        for symbol in fetch_crypto_yahoo.YAHOO_TICKERS:
+            df = fetch_crypto_yahoo.save_coin_history(symbol)
+            last = df.iloc[-1]
+            latest[symbol] = {"date": str(last["date"]), "price": float(last["price"])}
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail=f"Yahoo Finance refresh failed: {exc}") from exc
+    return {"status": "ok", "latest": latest}
+
+
+@app.post("/data/refresh-fx-rate")
+def refresh_fx_rate():
+    try:
+        latest = fetch_fx.save_usd_vnd_rate()
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail=f"FX rate refresh failed: {exc}") from exc
+    return {"status": "ok", "latest": latest}

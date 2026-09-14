@@ -6,11 +6,18 @@ import pandas as pd
 
 DATA_DIR = Path(__file__).resolve().parents[2] / "data"
 
-SYMBOLS = ("btc", "eth", "gold")
+SYMBOLS = ("btc", "eth", "gold", "uni")
+
+PRIMARY_FILES = {
+    "btc": "btc_binance.csv",
+    "eth": "eth_binance.csv",
+    "uni": "uni_binance.csv",
+    "gold": "gold_yahoo_finance.csv",
+}
 
 
 def load_raw(symbol: str) -> pd.DataFrame:
-    path = DATA_DIR / f"{symbol}.csv"
+    path = DATA_DIR / PRIMARY_FILES[symbol]
     if not path.exists():
         raise FileNotFoundError(f"Missing data file: {path}. Run the fetch script first.")
     return pd.read_csv(path)
