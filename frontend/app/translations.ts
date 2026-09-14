@@ -28,6 +28,26 @@ export const GOLD_UNIT_OPTIONS: Record<Lang, { value: GoldUnit; label: string }[
   ],
 };
 
+const HISTORY_YEARS = [1, 1.5, 2, 2.5, 3, 3.5, 4, 4.5, 5];
+const yearsToDays = (years: number) => Math.round(years * 365);
+
+// One shared "how much history to fetch" range, used by every fetch/refresh
+// button (primary Binance/Yahoo Finance data, and the CoinGecko/Yahoo
+// Finance/GoldAPI reference sources).
+export const HISTORY_RANGE_OPTIONS = HISTORY_YEARS.map((years) => ({
+  years,
+  days: yearsToDays(years),
+}));
+
+// GoldAPI caps each request at 90 days (see GOLDAPI_MAX_RANGE_DAYS in
+// backend/app/data/fetch_gold.py), so requests = ceil(days/85) chunks + 1
+// spot-price call. Used to show an approximate request count next to the
+// GoldAPI button for whatever range is currently selected.
+const GOLDAPI_MAX_RANGE_DAYS = 85;
+export function goldApiRequestsForDays(days: number): number {
+  return Math.ceil(days / GOLDAPI_MAX_RANGE_DAYS) + 1;
+}
+
 export const SYMBOLS: Record<Lang, { value: string; label: string }[]> = {
   vi: [
     { value: "gold", label: "Vàng (Gold)" },
@@ -75,9 +95,17 @@ export const MODEL_NOTES: Record<Lang, Record<string, string>> = {
 
 export interface TextDict {
   subtitle: string;
-  refreshNote: string;
-  refreshButton: string;
-  refreshLoading: string;
+  fetchNote: string;
+  fetchCryptoButton: string;
+  fetchCryptoLoading: string;
+  fetchCryptoErrorFallback: string;
+  fetchGoldButton: string;
+  fetchGoldLoading: string;
+  fetchGoldErrorFallback: string;
+  trainNote: string;
+  trainButton: string;
+  trainLoading: string;
+  trainErrorFallback: string;
   assetLabel: string;
   modelLabel: string;
   horizonLabel: string;
@@ -87,7 +115,6 @@ export interface TextDict {
   expectedChangeLabel: string;
   loadErrorFallback: string;
   genericErrorFallback: string;
-  refreshErrorFallback: string;
   goldButton: string;
   goldButtonLoading: string;
   goldNote: string;
@@ -107,6 +134,9 @@ export interface TextDict {
   fxErrorFallback: string;
   fxRateLabel: (rate: number, date: string) => string;
   goldApiDaysFetchedLabel: (days: number) => string;
+  fetchRangeLabel: string;
+  fetchRangeOptionLabel: (years: number) => string;
+  goldApiRequestsNote: (requests: number) => string;
   chartActualLabel: string;
   chartPredictedLabel: string;
   chartZoomIn: string;
@@ -120,20 +150,28 @@ export const TEXT: Record<Lang, TextDict> = {
   vi: {
     subtitle:
       "Dự đoán giá BTC / ETH / UNI / Vàng bằng Machine Learning. Chỉ mang tính tham khảo, không phải lời khuyên đầu tư.",
-    refreshNote:
-      "Nút này tải lịch sử giá BTC/ETH/UNI/Vàng mới nhất (Binance + Yahoo Finance) rồi huấn luyện lại các model dự đoán (Linear Regression, Random Forest, LSTM). Cần bấm ít nhất 1 lần thì biểu đồ bên dưới mới có dữ liệu để hiển thị; quá trình huấn luyện có thể mất vài phút.",
-    refreshButton: "Tải dữ liệu & huấn luyện model",
-    refreshLoading: "Đang tải & huấn luyện...",
+    fetchNote:
+      "Lấy lịch sử giá mới nhất — nguồn dữ liệu chính dùng để huấn luyện model. Cần bấm ít nhất 1 lần trước khi huấn luyện.",
+    fetchCryptoButton: "Tải dữ liệu Crypto (Binance)",
+    fetchCryptoLoading: "Đang tải...",
+    fetchCryptoErrorFallback: "Không tải được dữ liệu crypto.",
+    fetchGoldButton: "Tải dữ liệu Vàng (Yahoo Finance)",
+    fetchGoldLoading: "Đang tải...",
+    fetchGoldErrorFallback: "Không tải được dữ liệu vàng.",
+    trainNote:
+      "Huấn luyện lại các model dự đoán (Linear Regression, Random Forest, LSTM) cho cả 4 tài sản, dùng dữ liệu đã tải. Cần bấm ít nhất 1 lần thì biểu đồ bên dưới mới có dữ liệu để hiển thị; có thể mất vài phút.",
+    trainButton: "Huấn luyện model",
+    trainLoading: "Đang huấn luyện...",
+    trainErrorFallback: "Không huấn luyện được model.",
     assetLabel: "Tài sản",
     modelLabel: "Model",
     horizonLabel: "Số ngày dự đoán",
-    historyDaysLabel: "Lịch sử (ngày)",
+    historyDaysLabel: "Lịch sử hiển thị",
     latestPriceLabel: "Giá gần nhất",
     forecastLabel: (horizon) => `Dự đoán (${horizon} ngày tới)`,
     expectedChangeLabel: "Thay đổi dự kiến",
     loadErrorFallback: "Không tải được dữ liệu từ API.",
     genericErrorFallback: "Đã có lỗi xảy ra.",
-    refreshErrorFallback: "Không tải được dữ liệu.",
     goldButton: "Cập nhật lịch sử giá vàng (GoldAPI)",
     goldButtonLoading: "Đang cập nhật...",
     goldNote:
@@ -141,6 +179,9 @@ export const TEXT: Record<Lang, TextDict> = {
     goldErrorFallback: "Không cập nhật được giá vàng.",
     goldApiResultLabel: "Giá GoldAPI mới nhất",
     goldApiDaysFetchedLabel: (days) => `đã lấy ${days} ngày lịch sử`,
+    fetchRangeLabel: "Số năm lấy lịch sử",
+    fetchRangeOptionLabel: (years) => `${years} năm`,
+    goldApiRequestsNote: (requests) => `~${requests} request GoldAPI`,
     chartActualLabel: "Giá thực tế",
     chartPredictedLabel: "Dự đoán",
     chartZoomIn: "Phóng to",
@@ -166,20 +207,28 @@ export const TEXT: Record<Lang, TextDict> = {
   en: {
     subtitle:
       "BTC / ETH / UNI / Gold price prediction using Machine Learning. For informational purposes only — not investment advice.",
-    refreshNote:
-      "This button fetches the latest BTC/ETH/UNI/Gold price history (Binance + Yahoo Finance) and retrains the prediction models (Linear Regression, Random Forest, LSTM). Click it at least once so the chart below has data; training can take a few minutes.",
-    refreshButton: "Fetch data & train models",
-    refreshLoading: "Fetching & training...",
+    fetchNote:
+      "Fetches the latest price history — the primary data used to train models. Run this at least once before training.",
+    fetchCryptoButton: "Fetch crypto data (Binance)",
+    fetchCryptoLoading: "Fetching...",
+    fetchCryptoErrorFallback: "Failed to fetch crypto data.",
+    fetchGoldButton: "Fetch gold data (Yahoo Finance)",
+    fetchGoldLoading: "Fetching...",
+    fetchGoldErrorFallback: "Failed to fetch gold data.",
+    trainNote:
+      "Retrains the prediction models (Linear Regression, Random Forest, LSTM) for all 4 assets, using the data already fetched. Run this at least once so the chart below has data; training can take a few minutes.",
+    trainButton: "Train models",
+    trainLoading: "Training...",
+    trainErrorFallback: "Failed to train models.",
     assetLabel: "Asset",
     modelLabel: "Model",
     horizonLabel: "Forecast horizon (days)",
-    historyDaysLabel: "History (days)",
+    historyDaysLabel: "History shown",
     latestPriceLabel: "Latest price",
     forecastLabel: (horizon) => `Forecast (next ${horizon} days)`,
     expectedChangeLabel: "Expected change",
     loadErrorFallback: "Failed to load data from the API.",
     genericErrorFallback: "Something went wrong.",
-    refreshErrorFallback: "Failed to fetch data.",
     goldButton: "Update gold price history (GoldAPI)",
     goldButtonLoading: "Updating...",
     goldNote:
@@ -187,6 +236,9 @@ export const TEXT: Record<Lang, TextDict> = {
     goldErrorFallback: "Failed to update the gold price.",
     goldApiResultLabel: "Latest GoldAPI price",
     goldApiDaysFetchedLabel: (days) => `${days} days of history fetched`,
+    fetchRangeLabel: "History range to fetch",
+    fetchRangeOptionLabel: (years) => `${years} year(s)`,
+    goldApiRequestsNote: (requests) => `~${requests} GoldAPI requests`,
     chartActualLabel: "Actual price",
     chartPredictedLabel: "Forecast",
     chartZoomIn: "Zoom in",

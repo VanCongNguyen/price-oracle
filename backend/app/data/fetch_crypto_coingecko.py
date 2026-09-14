@@ -5,6 +5,8 @@ from pathlib import Path
 import pandas as pd
 import requests
 
+from app.data.archive import save_dated_csv
+
 DATA_DIR = Path(__file__).resolve().parents[2] / "data"
 COINGECKO_BASE = "https://api.coingecko.com/api/v3"
 # CoinGecko's edge protection resets connections that use the default
@@ -36,14 +38,13 @@ def fetch_coin_history(coin_id: str, vs_currency: str = "usd", days: int = 365) 
 
 def save_coin_history(symbol: str, days: int = 365) -> pd.DataFrame:
     coin_id = COIN_IDS[symbol]
-    DATA_DIR.mkdir(parents=True, exist_ok=True)
     df = fetch_coin_history(coin_id, days=days)
-    out_path = DATA_DIR / f"{symbol}_coingecko.csv"
-    df.to_csv(out_path, index=False)
+    base_path = DATA_DIR / f"{symbol}_coingecko.csv"
+    save_dated_csv(df, base_path)
     return df
 
 
 if __name__ == "__main__":
     for symbol in COIN_IDS:
         df = save_coin_history(symbol)
-        print(f"Saved {symbol} price history to {DATA_DIR / f'{symbol}_coingecko.csv'}")
+        print(f"Saved {symbol} price history ({len(df)} rows)")

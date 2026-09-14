@@ -9,6 +9,8 @@ import requests
 import yfinance as yf
 from dotenv import load_dotenv
 
+from app.data.archive import save_dated_csv
+
 load_dotenv()
 
 DATA_DIR = Path(__file__).resolve().parents[2] / "data"
@@ -19,20 +21,20 @@ GOLDAPI_MAX_RANGE_DAYS = 85  # API hard limit is 90 days/request; leave some mar
 GOLDAPI_REQUEST_DELAY_SEC = 1.5  # avoid tripping the short-term rate limit between requests
 
 
-def fetch_gold_history(period: str = "5y", interval: str = "1d"):
+def fetch_gold_history(days: int = 365, interval: str = "1d"):
+    end = pd.Timestamp.utcnow().normalize()
+    start = end - pd.Timedelta(days=days)
     ticker = yf.Ticker(GOLD_TICKER)
-    df = ticker.history(period=period, interval=interval)
+    df = ticker.history(start=start, end=end, interval=interval)
     df = df.reset_index()[["Date", "Open", "High", "Low", "Close", "Volume"]]
     df.columns = ["date", "open", "high", "low", "close", "volume"]
     return df
 
 
-def save_gold_history(period: str = "5y", interval: str = "1d") -> Path:
-    DATA_DIR.mkdir(parents=True, exist_ok=True)
-    df = fetch_gold_history(period=period, interval=interval)
-    out_path = DATA_DIR / "gold_yahoo_finance.csv"
-    df.to_csv(out_path, index=False)
-    return out_path
+def save_gold_history(days: int = 365, interval: str = "1d") -> Path:
+    df = fetch_gold_history(days=days, interval=interval)
+    base_path = DATA_DIR / "gold_yahoo_finance.csv"
+    return save_dated_csv(df, base_path)
 
 
 def _goldapi_headers() -> dict:
@@ -67,7 +69,6 @@ def save_goldapi_history(days: int = 365) -> dict:
     """GoldAPI caps each request at 90 days, so this fetches in sequential
     chunks; saved to a separate file (gold_goldapi.csv) to compare against
     the primary yfinance source."""
-    DATA_DIR.mkdir(parents=True, exist_ok=True)
     end = pd.Timestamp.utcnow().normalize()
     start = end - pd.Timedelta(days=days)
 
@@ -84,8 +85,8 @@ def save_goldapi_history(days: int = 365) -> dict:
     rows.append(latest)
 
     df = pd.DataFrame(rows).drop_duplicates(subset="date", keep="last").sort_values("date")
-    out_path = DATA_DIR / "gold_goldapi.csv"
-    df.to_csv(out_path, index=False)
+    base_path = DATA_DIR / "gold_goldapi.csv"
+    save_dated_csv(df, base_path)
     return {"latest": latest, "days_fetched": len(df)}
 
 

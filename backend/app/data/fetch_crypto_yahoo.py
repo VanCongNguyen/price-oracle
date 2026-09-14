@@ -2,7 +2,10 @@
 
 from pathlib import Path
 
+import pandas as pd
 import yfinance as yf
+
+from app.data.archive import save_dated_csv
 
 DATA_DIR = Path(__file__).resolve().parents[2] / "data"
 
@@ -15,23 +18,24 @@ YAHOO_TICKERS = {
 }
 
 
-def fetch_coin_history(ticker: str, period: str = "1y", interval: str = "1d"):
-    df = yf.Ticker(ticker).history(period=period, interval=interval)
+def fetch_coin_history(ticker: str, days: int = 365, interval: str = "1d"):
+    end = pd.Timestamp.utcnow().normalize()
+    start = end - pd.Timedelta(days=days)
+    df = yf.Ticker(ticker).history(start=start, end=end, interval=interval)
     df = df.reset_index()[["Date", "Close", "Volume"]]
     df.columns = ["date", "price", "volume"]
     return df
 
 
-def save_coin_history(symbol: str, period: str = "1y", interval: str = "1d"):
+def save_coin_history(symbol: str, days: int = 365, interval: str = "1d"):
     ticker = YAHOO_TICKERS[symbol]
-    DATA_DIR.mkdir(parents=True, exist_ok=True)
-    df = fetch_coin_history(ticker, period=period, interval=interval)
-    out_path = DATA_DIR / f"{symbol}_yahoo_finance.csv"
-    df.to_csv(out_path, index=False)
+    df = fetch_coin_history(ticker, days=days, interval=interval)
+    base_path = DATA_DIR / f"{symbol}_yahoo_finance.csv"
+    save_dated_csv(df, base_path)
     return df
 
 
 if __name__ == "__main__":
     for symbol in YAHOO_TICKERS:
         df = save_coin_history(symbol)
-        print(f"Saved {symbol} price history to {DATA_DIR / f'{symbol}_yahoo_finance.csv'}")
+        print(f"Saved {symbol} price history ({len(df)} rows)")

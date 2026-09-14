@@ -5,6 +5,8 @@ from pathlib import Path
 import pandas as pd
 import requests
 
+from app.data.archive import save_dated_csv
+
 DATA_DIR = Path(__file__).resolve().parents[2] / "data"
 BINANCE_BASE = "https://api.binance.com/api/v3"
 
@@ -47,11 +49,9 @@ def fetch_coin_history(pair: str, interval: str = "1d", days: int = 365) -> pd.D
 
 def save_coin_history(symbol: str, days: int = 365) -> Path:
     pair = TRADING_PAIRS[symbol]
-    DATA_DIR.mkdir(parents=True, exist_ok=True)
     df = fetch_coin_history(pair, days=days)
-    out_path = DATA_DIR / f"{symbol}_binance.csv"
-    df.to_csv(out_path, index=False)
-    return out_path
+    base_path = DATA_DIR / f"{symbol}_binance.csv"
+    return save_dated_csv(df, base_path)
 
 
 if __name__ == "__main__":

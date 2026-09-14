@@ -16,7 +16,9 @@ import PriceChart, { ChartPoint } from "./components/PriceChart";
 import {
   GOLD_UNIT_OPTIONS,
   GOLD_UNITS,
+  goldApiRequestsForDays,
   GoldUnit,
+  HISTORY_RANGE_OPTIONS,
   Lang,
   MODEL_NOTES,
   MODELS,
@@ -42,7 +44,7 @@ export default function Home() {
   const [symbol, setSymbol] = useState("gold");
   const [model, setModel] = useState("random_forest");
   const [horizon, setHorizon] = useState(30);
-  const [historyDays, setHistoryDays] = useState(360);
+  const [historyDays, setHistoryDays] = useState(365);
 
   const [history, setHistory] = useState<HistoryPoint[]>([]);
   const [predictions, setPredictions] = useState<PredictionPoint[]>([]);
@@ -50,8 +52,14 @@ export default function Home() {
   const [error, setError] = useState("");
 
   const [refreshKey, setRefreshKey] = useState(0);
-  const [refreshing, setRefreshing] = useState(false);
-  const [refreshError, setRefreshError] = useState("");
+  const [fetchingCrypto, setFetchingCrypto] = useState(false);
+  const [fetchCryptoError, setFetchCryptoError] = useState("");
+  const [fetchingGold, setFetchingGold] = useState(false);
+  const [fetchGoldError, setFetchGoldError] = useState("");
+  const [training, setTraining] = useState(false);
+  const [trainError, setTrainError] = useState("");
+
+  const [fetchDays, setFetchDays] = useState(365);
 
   const [goldRefreshing, setGoldRefreshing] = useState(false);
   const [goldRefreshError, setGoldRefreshError] = useState("");
@@ -146,20 +154,58 @@ export default function Home() {
     setYahooRefreshError("");
   }, [symbol]);
 
-  async function handleRefreshData() {
-    setRefreshing(true);
-    setRefreshError("");
+  async function handleFetchCrypto() {
+    setFetchingCrypto(true);
+    setFetchCryptoError("");
     try {
-      const res = await fetch(`${API_BASE}/data/refresh`, { method: "POST" });
+      const res = await fetch(`${API_BASE}/data/fetch-crypto?days=${fetchDays}`, {
+        method: "POST",
+      });
       if (!res.ok) {
         const body = await res.json().catch(() => null);
-        throw new Error(body?.detail ?? t.refreshErrorFallback);
+        throw new Error(body?.detail ?? t.fetchCryptoErrorFallback);
       }
       setRefreshKey((k) => k + 1);
     } catch (e) {
-      setRefreshError(e instanceof Error ? e.message : t.genericErrorFallback);
+      setFetchCryptoError(e instanceof Error ? e.message : t.genericErrorFallback);
     } finally {
-      setRefreshing(false);
+      setFetchingCrypto(false);
+    }
+  }
+
+  async function handleFetchGold() {
+    setFetchingGold(true);
+    setFetchGoldError("");
+    try {
+      const res = await fetch(`${API_BASE}/data/fetch-gold?days=${fetchDays}`, {
+        method: "POST",
+      });
+      if (!res.ok) {
+        const body = await res.json().catch(() => null);
+        throw new Error(body?.detail ?? t.fetchGoldErrorFallback);
+      }
+      setRefreshKey((k) => k + 1);
+    } catch (e) {
+      setFetchGoldError(e instanceof Error ? e.message : t.genericErrorFallback);
+    } finally {
+      setFetchingGold(false);
+    }
+  }
+
+  async function handleTrainModels() {
+    setTraining(true);
+    setTrainError("");
+    try {
+      const res = await fetch(`${API_BASE}/data/train`, { method: "POST" });
+      if (!res.ok) {
+        const body = await res.json().catch(() => null);
+        throw new Error(body?.detail ?? t.trainErrorFallback);
+      }
+      setRefreshKey((k) => k + 1);
+    } catch (e) {
+      setTrainError(e instanceof Error ? e.message : t.genericErrorFallback);
+    } finally {
+      setTraining(false);
     }
   }
 
@@ -167,7 +213,9 @@ export default function Home() {
     setGoldRefreshing(true);
     setGoldRefreshError("");
     try {
-      const res = await fetch(`${API_BASE}/data/refresh-gold-price`, { method: "POST" });
+      const res = await fetch(`${API_BASE}/data/refresh-gold-price?days=${fetchDays}`, {
+        method: "POST",
+      });
       const body = await res.json().catch(() => null);
       if (!res.ok) {
         throw new Error(body?.detail ?? t.goldErrorFallback);
@@ -188,7 +236,10 @@ export default function Home() {
     setCoingeckoRefreshing(true);
     setCoingeckoRefreshError("");
     try {
-      const res = await fetch(`${API_BASE}/data/refresh-crypto-coingecko`, { method: "POST" });
+      const res = await fetch(
+        `${API_BASE}/data/refresh-crypto-coingecko?days=${fetchDays}`,
+        { method: "POST" }
+      );
       const body = await res.json().catch(() => null);
       if (!res.ok) {
         throw new Error(body?.detail ?? t.coingeckoErrorFallback);
@@ -206,7 +257,9 @@ export default function Home() {
     setYahooRefreshing(true);
     setYahooRefreshError("");
     try {
-      const res = await fetch(`${API_BASE}/data/refresh-crypto-yahoo`, { method: "POST" });
+      const res = await fetch(`${API_BASE}/data/refresh-crypto-yahoo?days=${fetchDays}`, {
+        method: "POST",
+      });
       const body = await res.json().catch(() => null);
       if (!res.ok) {
         throw new Error(body?.detail ?? t.yahooErrorFallback);
@@ -279,94 +332,6 @@ export default function Home() {
           <NativeSelect.Indicator />
         </NativeSelect.Root>
       </Flex>
-
-      <Box mt={4} p={4} borderWidth="1px" borderRadius="md" bg="gray.50">
-        <Text fontSize="sm" mb={2}>
-          {t.refreshNote}
-        </Text>
-        <Button size="sm" onClick={handleRefreshData} loading={refreshing} loadingText={t.refreshLoading}>
-          {t.refreshButton}
-        </Button>
-        {refreshError && (
-          <Text color="red.500" fontSize="sm" mt={2}>
-            {refreshError}
-          </Text>
-        )}
-      </Box>
-
-      {symbol === "gold" && (
-        <Box mt={4} p={4} borderWidth="1px" borderRadius="md" bg="yellow.50">
-          <Text fontSize="sm" mb={2}>
-            {t.goldNote}
-          </Text>
-          <Button
-            size="sm"
-            onClick={handleRefreshGoldPrice}
-            loading={goldRefreshing}
-            loadingText={t.goldButtonLoading}
-          >
-            {t.goldButton}
-          </Button>
-          {goldApiPrice && (
-            <Text fontSize="sm" mt={2}>
-              {t.goldApiResultLabel}: {(goldApiPrice.price * unitFactor).toLocaleString()}{" "}
-              {unitSuffix} ({goldApiPrice.date}) — {t.goldApiDaysFetchedLabel(goldApiPrice.daysFetched)}
-            </Text>
-          )}
-          {goldRefreshError && (
-            <Text color="red.500" fontSize="sm" mt={2}>
-              {goldRefreshError}
-            </Text>
-          )}
-        </Box>
-      )}
-
-      {symbol !== "gold" && (
-        <Box mt={4} p={4} borderWidth="1px" borderRadius="md" bg="blue.50">
-          <Text fontSize="sm" mb={2}>
-            {t.coingeckoNote}
-          </Text>
-          <Flex gap={2} wrap="wrap">
-            <Button
-              size="sm"
-              onClick={handleRefreshCoinGecko}
-              loading={coingeckoRefreshing}
-              loadingText={t.coingeckoButtonLoading}
-            >
-              {t.coingeckoButton}
-            </Button>
-            <Button
-              size="sm"
-              onClick={handleRefreshYahoo}
-              loading={yahooRefreshing}
-              loadingText={t.yahooButtonLoading}
-            >
-              {t.yahooButton}
-            </Button>
-          </Flex>
-          {coingeckoPrice && (
-            <Text fontSize="sm" mt={2}>
-              {t.coingeckoResultLabel}: {coingeckoPrice.price.toLocaleString()} USD (
-              {coingeckoPrice.date})
-            </Text>
-          )}
-          {coingeckoRefreshError && (
-            <Text color="red.500" fontSize="sm" mt={2}>
-              {coingeckoRefreshError}
-            </Text>
-          )}
-          {yahooPrice && (
-            <Text fontSize="sm" mt={2}>
-              {t.yahooResultLabel}: {yahooPrice.price.toLocaleString()} USD ({yahooPrice.date})
-            </Text>
-          )}
-          {yahooRefreshError && (
-            <Text color="red.500" fontSize="sm" mt={2}>
-              {yahooRefreshError}
-            </Text>
-          )}
-        </Box>
-      )}
 
       <Flex gap={4} wrap="wrap" mt={6} mb={6}>
         <Box>
@@ -476,21 +441,155 @@ export default function Home() {
           />
         </Box>
 
-        <Box>
-          <Text fontSize="xs" color="gray.500" mb={1}>
-            {t.historyDaysLabel}
-          </Text>
-          <Input
-            size="sm"
-            type="number"
-            width="120px"
-            min={30}
-            max={1000}
-            value={historyDays}
-            onChange={(e) => setHistoryDays(Number(e.target.value))}
-          />
-        </Box>
       </Flex>
+
+      <Box mb={4}>
+        <Text fontSize="xs" color="gray.500" mb={1}>
+          {t.fetchRangeLabel}
+        </Text>
+        <NativeSelect.Root size="sm" width="160px">
+          <NativeSelect.Field
+            value={fetchDays}
+            onChange={(e) => setFetchDays(Number(e.target.value))}
+          >
+            {HISTORY_RANGE_OPTIONS.map((o) => (
+              <option key={o.days} value={o.days}>
+                {t.fetchRangeOptionLabel(o.years)}
+              </option>
+            ))}
+          </NativeSelect.Field>
+          <NativeSelect.Indicator />
+        </NativeSelect.Root>
+      </Box>
+
+      <Box mt={4} p={4} borderWidth="1px" borderRadius="md" bg="gray.50">
+        <Text fontSize="sm" mb={2}>
+          {t.fetchNote}
+        </Text>
+        <Flex gap={2} wrap="wrap">
+          {symbol !== "gold" && (
+            <Button
+              size="sm"
+              onClick={handleFetchCrypto}
+              loading={fetchingCrypto}
+              loadingText={t.fetchCryptoLoading}
+            >
+              {t.fetchCryptoButton}
+            </Button>
+          )}
+          {symbol === "gold" && (
+            <Button
+              size="sm"
+              onClick={handleFetchGold}
+              loading={fetchingGold}
+              loadingText={t.fetchGoldLoading}
+            >
+              {t.fetchGoldButton}
+            </Button>
+          )}
+        </Flex>
+        {symbol !== "gold" && fetchCryptoError && (
+          <Text color="red.500" fontSize="sm" mt={2}>
+            {fetchCryptoError}
+          </Text>
+        )}
+        {symbol === "gold" && fetchGoldError && (
+          <Text color="red.500" fontSize="sm" mt={2}>
+            {fetchGoldError}
+          </Text>
+        )}
+      </Box>
+
+      {symbol === "gold" && (
+        <Box mt={4} p={4} borderWidth="1px" borderRadius="md" bg="yellow.50">
+          <Text fontSize="sm" mb={2}>
+            {t.goldNote}
+          </Text>
+          <Button
+            size="sm"
+            onClick={handleRefreshGoldPrice}
+            loading={goldRefreshing}
+            loadingText={t.goldButtonLoading}
+          >
+            {t.goldButton}
+          </Button>
+          <Text fontSize="xs" color="gray.500" mt={1}>
+            {t.goldApiRequestsNote(goldApiRequestsForDays(fetchDays))}
+          </Text>
+          {goldApiPrice && (
+            <Text fontSize="sm" mt={2}>
+              {t.goldApiResultLabel}: {(goldApiPrice.price * unitFactor).toLocaleString()}{" "}
+              {unitSuffix} ({goldApiPrice.date}) — {t.goldApiDaysFetchedLabel(goldApiPrice.daysFetched)}
+            </Text>
+          )}
+          {goldRefreshError && (
+            <Text color="red.500" fontSize="sm" mt={2}>
+              {goldRefreshError}
+            </Text>
+          )}
+        </Box>
+      )}
+
+      {symbol !== "gold" && (
+        <Box mt={4} p={4} borderWidth="1px" borderRadius="md" bg="blue.50">
+          <Text fontSize="sm" mb={2}>
+            {t.coingeckoNote}
+          </Text>
+          <Flex gap={2} wrap="wrap">
+            <Button
+              size="sm"
+              onClick={handleRefreshCoinGecko}
+              loading={coingeckoRefreshing}
+              loadingText={t.coingeckoButtonLoading}
+            >
+              {t.coingeckoButton}
+            </Button>
+            <Button
+              size="sm"
+              onClick={handleRefreshYahoo}
+              loading={yahooRefreshing}
+              loadingText={t.yahooButtonLoading}
+            >
+              {t.yahooButton}
+            </Button>
+          </Flex>
+          {coingeckoPrice && (
+            <Text fontSize="sm" mt={2}>
+              {t.coingeckoResultLabel}: {coingeckoPrice.price.toLocaleString()} USD (
+              {coingeckoPrice.date})
+            </Text>
+          )}
+          {coingeckoRefreshError && (
+            <Text color="red.500" fontSize="sm" mt={2}>
+              {coingeckoRefreshError}
+            </Text>
+          )}
+          {yahooPrice && (
+            <Text fontSize="sm" mt={2}>
+              {t.yahooResultLabel}: {yahooPrice.price.toLocaleString()} USD ({yahooPrice.date})
+            </Text>
+          )}
+          {yahooRefreshError && (
+            <Text color="red.500" fontSize="sm" mt={2}>
+              {yahooRefreshError}
+            </Text>
+          )}
+        </Box>
+      )}
+
+      <Box mt={4} p={4} borderWidth="1px" borderRadius="md" bg="gray.50">
+        <Text fontSize="sm" mb={2}>
+          {t.trainNote}
+        </Text>
+        <Button size="sm" onClick={handleTrainModels} loading={training} loadingText={t.trainLoading}>
+          {t.trainButton}
+        </Button>
+        {trainError && (
+          <Text color="red.500" fontSize="sm" mt={2}>
+            {trainError}
+          </Text>
+        )}
+      </Box>
 
       {loading && <Spinner size="md" />}
       {!loading && error && <Text color="red.500">{error}</Text>}
@@ -530,6 +629,25 @@ export default function Home() {
           </SimpleGrid>
 
           <PriceChart data={chartData} t={t} />
+
+          <Box mt={2}>
+            <Text fontSize="xs" color="gray.500" mb={1}>
+              {t.historyDaysLabel}
+            </Text>
+            <NativeSelect.Root size="sm" width="140px">
+              <NativeSelect.Field
+                value={historyDays}
+                onChange={(e) => setHistoryDays(Number(e.target.value))}
+              >
+                {HISTORY_RANGE_OPTIONS.map((o) => (
+                  <option key={o.days} value={o.days}>
+                    {t.fetchRangeOptionLabel(o.years)}
+                  </option>
+                ))}
+              </NativeSelect.Field>
+              <NativeSelect.Indicator />
+            </NativeSelect.Root>
+          </Box>
         </>
       )}
     </Box>

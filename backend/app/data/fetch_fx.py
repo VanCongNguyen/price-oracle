@@ -5,6 +5,8 @@ from pathlib import Path
 import pandas as pd
 import requests
 
+from app.data.archive import save_dated_csv
+
 DATA_DIR = Path(__file__).resolve().parents[2] / "data"
 FX_URL = "https://open.er-api.com/v6/latest/USD"
 
@@ -22,10 +24,9 @@ def fetch_usd_vnd_rate() -> dict:
 
 
 def save_usd_vnd_rate() -> dict:
-    DATA_DIR.mkdir(parents=True, exist_ok=True)
-    out_path = DATA_DIR / "usd_vnd_exchangerate.csv"
     latest = fetch_usd_vnd_rate()
-    pd.DataFrame([latest]).to_csv(out_path, index=False)
+    base_path = DATA_DIR / "usd_vnd_exchangerate.csv"
+    save_dated_csv(pd.DataFrame([latest]), base_path)
     return latest
 
 

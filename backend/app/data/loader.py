@@ -4,11 +4,16 @@ from pathlib import Path
 
 import pandas as pd
 
+from app.data.archive import latest_dated_csv
+
 DATA_DIR = Path(__file__).resolve().parents[2] / "data"
 
 SYMBOLS = ("btc", "eth", "gold", "uni")
 
-PRIMARY_FILES = {
+# Suffix of the primary source's dated snapshot filename for each symbol,
+# e.g. "btc_binance.csv" matches "2026-09-14_btc_binance.csv". There's no
+# fixed undated filename — load_raw() always reads the most recent one.
+PRIMARY_FILE_SUFFIXES = {
     "btc": "btc_binance.csv",
     "eth": "eth_binance.csv",
     "uni": "uni_binance.csv",
@@ -17,9 +22,12 @@ PRIMARY_FILES = {
 
 
 def load_raw(symbol: str) -> pd.DataFrame:
-    path = DATA_DIR / PRIMARY_FILES[symbol]
-    if not path.exists():
-        raise FileNotFoundError(f"Missing data file: {path}. Run the fetch script first.")
+    suffix = PRIMARY_FILE_SUFFIXES[symbol]
+    path = latest_dated_csv(DATA_DIR, suffix)
+    if path is None:
+        raise FileNotFoundError(
+            f"Missing data file: no <date>_{suffix} snapshot in {DATA_DIR}. Run the fetch script first."
+        )
     return pd.read_csv(path)
 
 
