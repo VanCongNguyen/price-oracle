@@ -1,4 +1,4 @@
-"""Lấy giá coin tham khảo từ CoinGecko, lưu file riêng để so sánh với nguồn chính (Binance)."""
+"""Fetch reference coin prices from CoinGecko, saved to a separate file for comparison against the primary source (Binance)."""
 
 from pathlib import Path
 

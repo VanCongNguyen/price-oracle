@@ -1,4 +1,4 @@
-"""Load các file CSV giá đã fetch thành DataFrame chuẩn hoá: date, price, volume."""
+"""Load fetched price CSVs into a normalized DataFrame: date, price, volume."""
 
 from pathlib import Path
 
@@ -24,7 +24,7 @@ def load_raw(symbol: str) -> pd.DataFrame:
 
 
 def load_prices(symbol: str) -> pd.DataFrame:
-    """Trả về DataFrame với cột date (datetime, không timezone), price, volume."""
+    """Returns a DataFrame with columns date (timezone-naive datetime), price, volume."""
     df = load_raw(symbol)
 
     if symbol == "gold":

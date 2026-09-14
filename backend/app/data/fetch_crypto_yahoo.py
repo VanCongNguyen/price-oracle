@@ -1,4 +1,4 @@
-"""Lấy giá coin tham khảo từ Yahoo Finance, lưu file riêng để so sánh với nguồn chính (Binance)."""
+"""Fetch reference coin prices from Yahoo Finance, saved to a separate file for comparison against the primary source (Binance)."""
 
 from pathlib import Path
 
@@ -6,8 +6,8 @@ import yfinance as yf
 
 DATA_DIR = Path(__file__).resolve().parents[2] / "data"
 
-# UNI trên Yahoo Finance dùng ticker có hậu tố số (UNI7083-USD) vì "UNI-USD"
-# là 1 ticker khác đã ngừng cập nhật.
+# UNI on Yahoo Finance uses a numeric-suffixed ticker (UNI7083-USD) because
+# "UNI-USD" is a different ticker that stopped updating years ago.
 YAHOO_TICKERS = {
     "btc": "BTC-USD",
     "eth": "ETH-USD",

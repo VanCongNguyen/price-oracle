@@ -93,7 +93,7 @@ Every symbol also has one or more **secondary** sources, each in its own file th
 
 ## Conventions
 
-- Backend docstrings/comments are written in Vietnamese; match that when touching `backend/` code.
+- Backend docstrings/comments are written in English (matches the white-label/commercial packaging — see `LICENSE.md`/`SETUP.md`); match that when touching `backend/` code.
 - Frontend UI copy lives in `translations.ts` (VI + EN), not hardcoded in components; add new UI strings there for both languages.
 - Symbols are always one of `btc`, `eth`, `uni`, `gold`; model names are always one of `linear`, `random_forest`, `lstm` — both are enumerated as constants (`SYMBOLS` in `loader.py`, `MODEL_NAMES` in `predict.py`) rather than duplicated as literals.
 - Every `backend/data/*.csv` file is named `<symbol>_<source>.csv` (e.g. `btc_binance.csv`, `gold_goldapi.csv`) — never add a fetch script that writes a bare `<symbol>.csv`. Which file is *primary* (used by training/prediction) vs. *secondary* (reference-only) is defined by `loader.PRIMARY_FILES`, not by naming convention alone.

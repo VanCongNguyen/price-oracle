@@ -1,5 +1,5 @@
-"""Dự đoán giá tương lai bằng cách lặp lại (iterative forecasting):
-mỗi bước dự đoán 1 ngày, rồi dùng chính giá đó làm lag feature cho bước kế tiếp."""
+"""Iterative forecasting: predict one day at a time, then feed that price back
+in as a lag feature for the next step."""
 
 from pathlib import Path
 
@@ -50,7 +50,8 @@ def _forecast_baseline(symbol: str, model_name: str, horizon: int, history: pd.S
     for step in range(1, horizon + 1):
         feature_row = _build_feature_row(history)
         X = pd.DataFrame([feature_row])[FEATURE_COLUMNS]
-        pred_price = float(model.predict(X)[0])
+        pred_return = float(model.predict(X)[0])
+        pred_price = history.iloc[-1] * (1 + pred_return)
         pred_date = last_date + pd.Timedelta(days=step)
         predictions.append({"date": pred_date.strftime("%Y-%m-%d"), "price": pred_price})
         history.loc[pred_date] = pred_price

@@ -38,11 +38,11 @@ interface PredictionPoint {
 }
 
 export default function Home() {
-  const [lang, setLang] = useState<Lang>("vi");
-  const [symbol, setSymbol] = useState("btc");
+  const [lang, setLang] = useState<Lang>("en");
+  const [symbol, setSymbol] = useState("gold");
   const [model, setModel] = useState("random_forest");
-  const [horizon, setHorizon] = useState(7);
-  const [historyDays, setHistoryDays] = useState(90);
+  const [horizon, setHorizon] = useState(30);
+  const [historyDays, setHistoryDays] = useState(360);
 
   const [history, setHistory] = useState<HistoryPoint[]>([]);
   const [predictions, setPredictions] = useState<PredictionPoint[]>([]);
@@ -268,22 +268,16 @@ export default function Home() {
             {t.subtitle}
           </Text>
         </Box>
-        <Flex gap={1}>
-          <Button
-            size="xs"
-            variant={lang === "vi" ? "solid" : "outline"}
-            onClick={() => changeLang("vi")}
+        <NativeSelect.Root size="sm" width="60px">
+          <NativeSelect.Field
+            value={lang}
+            onChange={(e) => changeLang(e.target.value as Lang)}
           >
-            VI
-          </Button>
-          <Button
-            size="xs"
-            variant={lang === "en" ? "solid" : "outline"}
-            onClick={() => changeLang("en")}
-          >
-            EN
-          </Button>
-        </Flex>
+            <option value="vi">VI</option>
+            <option value="en">EN</option>
+          </NativeSelect.Field>
+          <NativeSelect.Indicator />
+        </NativeSelect.Root>
       </Flex>
 
       <Box mt={4} p={4} borderWidth="1px" borderRadius="md" bg="gray.50">
@@ -417,19 +411,24 @@ export default function Home() {
             <Text fontSize="xs" color="gray.500" mb={1}>
               {t.currencyLabel}
             </Text>
-            <Flex gap={1}>
-              <Button size="sm" variant={currency === "USD" ? "solid" : "outline"} onClick={() => setCurrency("USD")}>
-                USD
-              </Button>
-              <Button
-                size="sm"
-                variant={currency === "VND" ? "solid" : "outline"}
-                onClick={handleSwitchToVnd}
-                loading={fxRefreshing}
+            <NativeSelect.Root size="sm" width="120px">
+              <NativeSelect.Field
+                value={currency}
+                disabled={fxRefreshing}
+                onChange={(e) => {
+                  const next = e.target.value as "USD" | "VND";
+                  if (next === "VND") {
+                    handleSwitchToVnd();
+                  } else {
+                    setCurrency("USD");
+                  }
+                }}
               >
-                VND
-              </Button>
-            </Flex>
+                <option value="USD">USD</option>
+                <option value="VND">VND</option>
+              </NativeSelect.Field>
+              <NativeSelect.Indicator />
+            </NativeSelect.Root>
             {usdVndRate && (
               <Text fontSize="xs" color="gray.500" mt={1}>
                 {t.fxRateLabel(usdVndRate.rate, usdVndRate.date)}

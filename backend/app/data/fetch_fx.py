@@ -1,4 +1,4 @@
-"""Lấy tỷ giá USD/VND để quy đổi giá vàng tham khảo sang tiền Việt."""
+"""Fetch the USD/VND exchange rate for converting reference gold prices to VND."""
 
 from pathlib import Path
 

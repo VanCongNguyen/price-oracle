@@ -1,4 +1,4 @@
-"""Lấy dữ liệu giá vàng lịch sử từ yfinance, và giá tham khảo từ GoldAPI."""
+"""Fetch historical gold prices from yfinance, and reference prices from GoldAPI."""
 
 import os
 import time
@@ -15,8 +15,8 @@ DATA_DIR = Path(__file__).resolve().parents[2] / "data"
 GOLD_TICKER = "GC=F"  # COMEX Gold Futures
 GOLDAPI_SPOT_URL = "https://www.goldapi.io/api/price/XAU/USD"
 GOLDAPI_HISTORY_URL = "https://www.goldapi.io/api/history/XAU/USD"
-GOLDAPI_MAX_RANGE_DAYS = 85  # API hard limit is 90 days/request, để dư an toàn
-GOLDAPI_REQUEST_DELAY_SEC = 1.5  # tránh chạm rate limit ngắn hạn giữa các request
+GOLDAPI_MAX_RANGE_DAYS = 85  # API hard limit is 90 days/request; leave some margin
+GOLDAPI_REQUEST_DELAY_SEC = 1.5  # avoid tripping the short-term rate limit between requests
 
 
 def fetch_gold_history(period: str = "5y", interval: str = "1d"):
@@ -64,8 +64,9 @@ def fetch_goldapi_history_range(start: pd.Timestamp, end: pd.Timestamp) -> list[
 
 
 def save_goldapi_history(days: int = 365) -> dict:
-    """GoldAPI giới hạn 90 ngày/request nên chia thành nhiều đợt liên tiếp;
-    lưu file riêng (gold_goldapi.csv) để so sánh với nguồn chính yfinance."""
+    """GoldAPI caps each request at 90 days, so this fetches in sequential
+    chunks; saved to a separate file (gold_goldapi.csv) to compare against
+    the primary yfinance source."""
     DATA_DIR.mkdir(parents=True, exist_ok=True)
     end = pd.Timestamp.utcnow().normalize()
     start = end - pd.Timedelta(days=days)

@@ -1,4 +1,4 @@
-"""Huấn luyện model LSTM dự đoán giá theo chuỗi thời gian."""
+"""Train an LSTM model for time-series price prediction."""
 
 import json
 from pathlib import Path
@@ -16,6 +16,7 @@ from app.preprocessing import clean_prices
 
 ARTIFACTS_DIR = Path(__file__).resolve().parent / "artifacts"
 TEST_RATIO = 0.2
+VAL_RATIO = 0.15  # carved out of the train split for early stopping, keeps the test set untouched
 EPOCHS = 100
 BATCH_SIZE = 32
 LEARNING_RATE = 1e-3
@@ -35,16 +36,20 @@ def train_symbol(symbol: str) -> dict:
     cleaned = clean_prices(raw)
     prices = cleaned["price"].values.reshape(-1, 1)
 
-    split_idx = int(len(prices) * (1 - TEST_RATIO))
+    test_idx = int(len(prices) * (1 - TEST_RATIO))
+    val_idx = int(test_idx * (1 - VAL_RATIO))
+
     scaler = MinMaxScaler()
-    scaler.fit(prices[:split_idx])
+    scaler.fit(prices[:val_idx])
     scaled = scaler.transform(prices)
 
     X, y = make_sequences(scaled.flatten(), SEQ_LEN)
-    train_end = split_idx - SEQ_LEN
+    train_end = val_idx - SEQ_LEN
+    val_end = test_idx - SEQ_LEN
 
     X_train, y_train = X[:train_end], y[:train_end]
-    X_test, y_test = X[train_end:], y[train_end:]
+    X_val, y_val = X[train_end:val_end], y[train_end:val_end]
+    X_test, y_test = X[val_end:], y[val_end:]
 
     train_ds = TensorDataset(
         torch.tensor(X_train, dtype=torch.float32).unsqueeze(-1),
@@ -52,8 +57,9 @@ def train_symbol(symbol: str) -> dict:
     )
     train_loader = DataLoader(train_ds, batch_size=BATCH_SIZE, shuffle=True)
 
+    X_val_t = torch.tensor(X_val, dtype=torch.float32).unsqueeze(-1)
+    y_val_t = torch.tensor(y_val, dtype=torch.float32)
     X_test_t = torch.tensor(X_test, dtype=torch.float32).unsqueeze(-1)
-    y_test_t = torch.tensor(y_test, dtype=torch.float32)
 
     model = PriceLSTM()
     optimizer = torch.optim.Adam(model.parameters(), lr=LEARNING_RATE)
@@ -74,8 +80,8 @@ def train_symbol(symbol: str) -> dict:
 
         model.eval()
         with torch.no_grad():
-            val_pred = model(X_test_t)
-            val_loss = loss_fn(val_pred, y_test_t).item()
+            val_pred = model(X_val_t)
+            val_loss = loss_fn(val_pred, y_val_t).item()
 
         if val_loss < best_loss:
             best_loss = val_loss
@@ -108,6 +114,7 @@ def train_symbol(symbol: str) -> dict:
         "rmse": rmse,
         "mape_pct": mape,
         "n_train": len(X_train),
+        "n_val": len(X_val),
         "n_test": len(X_test),
         "epochs_ran": epoch,
     }

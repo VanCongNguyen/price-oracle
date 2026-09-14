@@ -1,4 +1,4 @@
-"""FastAPI app expose các endpoint lấy lịch sử giá và dự đoán."""
+"""FastAPI app exposing price history and prediction endpoints."""
 
 import os
 

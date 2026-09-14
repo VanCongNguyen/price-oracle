@@ -1,4 +1,4 @@
-"""Lấy dữ liệu giá coin lịch sử từ Binance API và lưu ra CSV."""
+"""Fetch historical coin prices from the Binance API and save to CSV."""
 
 from pathlib import Path
 

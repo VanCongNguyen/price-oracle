@@ -1,4 +1,4 @@
-"""Làm sạch dữ liệu giá và sinh feature phục vụ huấn luyện model."""
+"""Clean price data and generate features for model training."""
 
 import pandas as pd
 
@@ -7,8 +7,8 @@ ROLLING_WINDOWS = (7, 14)
 
 
 def clean_prices(df: pd.DataFrame) -> pd.DataFrame:
-    """Điền các ngày bị thiếu (cuối tuần/lễ với vàng) bằng forward-fill để có
-    chuỗi thời gian liên tục, cần thiết cho việc tạo lag feature và LSTM."""
+    """Forward-fill missing days (weekends/holidays for gold) so the series is
+    continuous, which lag features and the LSTM both depend on."""
     df = df.set_index("date").asfreq("D")
     df["price"] = df["price"].ffill()
     df["volume"] = df["volume"].ffill().fillna(0)
@@ -22,13 +22,16 @@ def add_features(df: pd.DataFrame) -> pd.DataFrame:
     for window in ROLLING_WINDOWS:
         df[f"rolling_mean_{window}"] = df["price"].shift(1).rolling(window).mean()
         df[f"rolling_std_{window}"] = df["price"].shift(1).rolling(window).std()
-    df["pct_change_1"] = df["price"].pct_change(1)
-    df["target"] = df["price"]
+    df["pct_change_1"] = df["price"].shift(1).pct_change(1)
+    # Target is the day's % price change, not the absolute price level: this keeps
+    # Random Forest from needing to extrapolate beyond the price range it trained on
+    # (price can hit new highs, but daily % change stays within a familiar range).
+    df["target_return"] = df["price"].pct_change(1)
     return df
 
 
 def build_dataset(raw_df: pd.DataFrame) -> pd.DataFrame:
-    """Full pipeline: clean -> feature engineering -> drop hàng thiếu do lag/rolling."""
+    """Full pipeline: clean -> feature engineering -> drop rows missing lag/rolling values."""
     df = clean_prices(raw_df)
     df = add_features(df)
     return df.dropna().reset_index(drop=True)

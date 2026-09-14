@@ -30,15 +30,15 @@ export const GOLD_UNIT_OPTIONS: Record<Lang, { value: GoldUnit; label: string }[
 
 export const SYMBOLS: Record<Lang, { value: string; label: string }[]> = {
   vi: [
+    { value: "gold", label: "Vàng (Gold)" },
     { value: "btc", label: "Bitcoin (BTC)" },
     { value: "eth", label: "Ethereum (ETH)" },
-    { value: "gold", label: "Vàng (Gold)" },
     { value: "uni", label: "Uniswap (UNI)" },
   ],
   en: [
+    { value: "gold", label: "Gold" },
     { value: "btc", label: "Bitcoin (BTC)" },
     { value: "eth", label: "Ethereum (ETH)" },
-    { value: "gold", label: "Gold" },
     { value: "uni", label: "Uniswap (UNI)" },
   ],
 };

@@ -1,4 +1,4 @@
-"""Kiến trúc LSTM dùng chung cho training và inference."""
+"""LSTM architecture shared by training and inference."""
 
 import torch
 from torch import nn
