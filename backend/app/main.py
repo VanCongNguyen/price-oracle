@@ -1,5 +1,8 @@
 """FastAPI app expose các endpoint lấy lịch sử giá và dự đoán."""
 
+import os
+
+from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -8,11 +11,15 @@ from app.data.loader import SYMBOLS, load_prices
 from app.models import train_baseline, train_lstm
 from app.models.predict import MODEL_NAMES, forecast
 
-app = FastAPI(title="Price Oracle API")
+load_dotenv()
+
+app = FastAPI(title=os.environ.get("APP_NAME", "Price Oracle") + " API")
+
+_allowed_origins = os.environ.get("ALLOWED_ORIGINS", "*")
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=["*"] if _allowed_origins == "*" else _allowed_origins.split(","),
     allow_methods=["*"],
     allow_headers=["*"],
 )

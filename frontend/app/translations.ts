@@ -73,7 +73,7 @@ export const MODEL_NOTES: Record<Lang, Record<string, string>> = {
   },
 };
 
-interface TextDict {
+export interface TextDict {
   subtitle: string;
   refreshNote: string;
   refreshButton: string;
@@ -107,12 +107,19 @@ interface TextDict {
   fxErrorFallback: string;
   fxRateLabel: (rate: number, date: string) => string;
   goldApiDaysFetchedLabel: (days: number) => string;
+  chartActualLabel: string;
+  chartPredictedLabel: string;
+  chartZoomIn: string;
+  chartZoomOut: string;
+  chartResetZoom: string;
+  chartFullscreen: string;
+  chartExitFullscreen: string;
 }
 
 export const TEXT: Record<Lang, TextDict> = {
   vi: {
     subtitle:
-      "Dự đoán giá BTC / ETH / Vàng bằng Machine Learning (dự án học tập, không dùng để đầu tư thực tế)",
+      "Dự đoán giá BTC / ETH / UNI / Vàng bằng Machine Learning. Chỉ mang tính tham khảo, không phải lời khuyên đầu tư.",
     refreshNote:
       "Nút này tải lịch sử giá BTC/ETH/UNI/Vàng mới nhất (Binance + Yahoo Finance) rồi huấn luyện lại các model dự đoán (Linear Regression, Random Forest, LSTM). Cần bấm ít nhất 1 lần thì biểu đồ bên dưới mới có dữ liệu để hiển thị; quá trình huấn luyện có thể mất vài phút.",
     refreshButton: "Tải dữ liệu & huấn luyện model",
@@ -134,6 +141,13 @@ export const TEXT: Record<Lang, TextDict> = {
     goldErrorFallback: "Không cập nhật được giá vàng.",
     goldApiResultLabel: "Giá GoldAPI mới nhất",
     goldApiDaysFetchedLabel: (days) => `đã lấy ${days} ngày lịch sử`,
+    chartActualLabel: "Giá thực tế",
+    chartPredictedLabel: "Dự đoán",
+    chartZoomIn: "Phóng to",
+    chartZoomOut: "Thu nhỏ",
+    chartResetZoom: "Xem lại toàn bộ",
+    chartFullscreen: "Toàn màn hình",
+    chartExitFullscreen: "Thoát toàn màn hình",
     coingeckoButton: "Cập nhật từ CoinGecko",
     coingeckoButtonLoading: "Đang cập nhật...",
     coingeckoNote:
@@ -151,7 +165,7 @@ export const TEXT: Record<Lang, TextDict> = {
   },
   en: {
     subtitle:
-      "BTC / ETH / Gold price prediction using Machine Learning (a learning project, not for real investment)",
+      "BTC / ETH / UNI / Gold price prediction using Machine Learning. For informational purposes only — not investment advice.",
     refreshNote:
       "This button fetches the latest BTC/ETH/UNI/Gold price history (Binance + Yahoo Finance) and retrains the prediction models (Linear Regression, Random Forest, LSTM). Click it at least once so the chart below has data; training can take a few minutes.",
     refreshButton: "Fetch data & train models",
@@ -173,6 +187,13 @@ export const TEXT: Record<Lang, TextDict> = {
     goldErrorFallback: "Failed to update the gold price.",
     goldApiResultLabel: "Latest GoldAPI price",
     goldApiDaysFetchedLabel: (days) => `${days} days of history fetched`,
+    chartActualLabel: "Actual price",
+    chartPredictedLabel: "Forecast",
+    chartZoomIn: "Zoom in",
+    chartZoomOut: "Zoom out",
+    chartResetZoom: "Reset zoom",
+    chartFullscreen: "Fullscreen",
+    chartExitFullscreen: "Exit fullscreen",
     coingeckoButton: "Update from CoinGecko",
     coingeckoButtonLoading: "Updating...",
     coingeckoNote:

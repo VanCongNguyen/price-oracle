@@ -11,6 +11,7 @@ services:
         required: false
     environment:
       - PYTHONUNBUFFERED=1
+      - APP_NAME=${APP_NAME:-Price Oracle}
 
   frontend:
     build: ./frontend
@@ -21,6 +22,7 @@ services:
       - /app/node_modules
       - /app/.next
     environment:
-      - NEXT_PUBLIC_API_BASE=http://localhost:8000
+      - NEXT_PUBLIC_API_BASE=${NEXT_PUBLIC_API_BASE:-http://localhost:8000}
+      - NEXT_PUBLIC_APP_NAME=${APP_NAME:-Price Oracle}
     depends_on:
       - backend

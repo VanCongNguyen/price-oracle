@@ -25,6 +25,7 @@ import {
 } from "./translations";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE ?? "http://127.0.0.1:8000";
+const APP_NAME = process.env.NEXT_PUBLIC_APP_NAME ?? "Price Oracle";
 
 interface HistoryPoint {
   date: string;
@@ -262,7 +263,7 @@ export default function Home() {
     <Box maxW="960px" mx="auto" px={4} py={8} fontFamily="system-ui, sans-serif">
       <Flex justify="space-between" align="flex-start" wrap="wrap" gap={2}>
         <Box>
-          <Heading size="xl">Price Oracle</Heading>
+          <Heading size="xl">{APP_NAME}</Heading>
           <Text color="gray.500" mt={1}>
             {t.subtitle}
           </Text>
@@ -529,7 +530,7 @@ export default function Home() {
             )}
           </SimpleGrid>
 
-          <PriceChart data={chartData} />
+          <PriceChart data={chartData} t={t} />
         </>
       )}
     </Box>
