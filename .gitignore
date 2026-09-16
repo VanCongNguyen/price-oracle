@@ -3,7 +3,6 @@ backend/.venv/
 backend/__pycache__/
 **/__pycache__/
 *.pyc
-backend/data/*.csv
 backend/data/*.db
 backend/app/models/artifacts/*.joblib
 backend/app/models/artifacts/*.pt

@@ -21,7 +21,8 @@ This codebase is sold as white-label source code (see `LICENSE.md`) — `SETUP.m
 python3 -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt        # torch install is large; see the CPU-only note in requirements.txt
 
-# 1. Fetch raw price history into backend/data/*.csv (gitignored, must run before anything else)
+# 1. Fetch raw price history into backend/data/*.csv (checked into git so a
+#    fresh clone already has data to train on; re-run this to refresh it)
 python -m app.data.fetch_crypto         # btc, eth, uni -> Binance
 python -m app.data.fetch_gold           # gold -> yfinance
 
@@ -70,6 +71,8 @@ Set `NEXT_PUBLIC_API_BASE` (defaults to `http://127.0.0.1:8000`) if the backend 
 ## Architecture
 
 **Data pipeline (backend/app/data/):** every fetch script writes to `backend/data/<YYYY-MM-DD>_<symbol>_<source>.csv` — no fixed/undated filename exists at all. Note the path: `DATA_DIR` in these scripts and in `loader.py` resolves to `backend/data/`, which is a sibling of `backend/app/`, *not* `backend/app/data/` (that's just where the loader/fetch code itself lives).
+
+`backend/data/*.csv` is checked into git (a deliberate choice — a fresh clone comes with data to train on immediately), unlike `backend/app/models/artifacts/` which stays gitignored. Since fetches never overwrite, only add, this means the repo grows a little with every fetch that runs — accepted as a tradeoff for not requiring a fetch step before the app is usable. `backend/data/*.db` is still gitignored (unused currently, kept in case one shows up locally).
 
 Every save function writes through `archive.save_dated_csv(df, base_path)` instead of `df.to_csv()` directly: `base_path`'s name (e.g. `btc_binance.csv`) is just used to derive that day's snapshot filename, it's never written as-is. This matters because every fetch pulls a rolling window (e.g. "last 365 days"); dating each fetch as its own file means a later fetch never silently discards a day that aged out of that window. Reading it back is symmetric: `archive.latest_dated_csv(dir_path, suffix)` globs `*_<suffix>` and returns the lexicographically-last match (dates sort correctly as strings) — `loader.load_raw()` uses this instead of opening a fixed path, so it's always reading whatever the most recent fetch produced.
 
