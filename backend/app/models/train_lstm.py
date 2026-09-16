@@ -12,7 +12,7 @@ from torch.utils.data import DataLoader, TensorDataset
 
 from app.data.loader import SYMBOLS, load_prices
 from app.models.lstm_model import SEQ_LEN, PriceLSTM
-from app.preprocessing import clean_prices
+from app.preprocessing import MAX_HORIZON, clean_prices
 
 ARTIFACTS_DIR = Path(__file__).resolve().parent / "artifacts"
 TEST_RATIO = 0.2
@@ -21,53 +21,29 @@ EPOCHS = 100
 BATCH_SIZE = 32
 LEARNING_RATE = 1e-3
 PATIENCE = 10
+HIDDEN_SIZE_GRID = (64, 128)
 
 
-def make_sequences(values: np.ndarray, seq_len: int):
+def make_sequences(values: np.ndarray, seq_len: int, max_horizon: int):
+    """Each target is a window of the next max_horizon values (not just the next
+    one), so the model learns to predict the whole forecast horizon directly in
+    one forward pass instead of being fed its own predictions back in."""
     X, y = [], []
-    for i in range(len(values) - seq_len):
+    for i in range(len(values) - seq_len - max_horizon + 1):
         X.append(values[i : i + seq_len])
-        y.append(values[i + seq_len])
+        y.append(values[i + seq_len : i + seq_len + max_horizon])
     return np.array(X), np.array(y)
 
 
-def train_symbol(symbol: str) -> dict:
-    raw = load_prices(symbol)
-    cleaned = clean_prices(raw)
-    prices = cleaned["price"].values.reshape(-1, 1)
-
-    test_idx = int(len(prices) * (1 - TEST_RATIO))
-    val_idx = int(test_idx * (1 - VAL_RATIO))
-
-    scaler = MinMaxScaler()
-    scaler.fit(prices[:val_idx])
-    scaled = scaler.transform(prices)
-
-    X, y = make_sequences(scaled.flatten(), SEQ_LEN)
-    train_end = val_idx - SEQ_LEN
-    val_end = test_idx - SEQ_LEN
-
-    X_train, y_train = X[:train_end], y[:train_end]
-    X_val, y_val = X[train_end:val_end], y[train_end:val_end]
-    X_test, y_test = X[val_end:], y[val_end:]
-
-    train_ds = TensorDataset(
-        torch.tensor(X_train, dtype=torch.float32).unsqueeze(-1),
-        torch.tensor(y_train, dtype=torch.float32),
-    )
-    train_loader = DataLoader(train_ds, batch_size=BATCH_SIZE, shuffle=True)
-
-    X_val_t = torch.tensor(X_val, dtype=torch.float32).unsqueeze(-1)
-    y_val_t = torch.tensor(y_val, dtype=torch.float32)
-    X_test_t = torch.tensor(X_test, dtype=torch.float32).unsqueeze(-1)
-
-    model = PriceLSTM()
+def _train_one_config(hidden_size: int, train_loader, X_val_t, y_val_t):
+    model = PriceLSTM(hidden_size=hidden_size)
     optimizer = torch.optim.Adam(model.parameters(), lr=LEARNING_RATE)
     loss_fn = nn.MSELoss()
 
     best_loss = float("inf")
     best_state = None
     patience_left = PATIENCE
+    epoch = 0
 
     for epoch in range(1, EPOCHS + 1):
         model.train()
@@ -92,14 +68,62 @@ def train_symbol(symbol: str) -> dict:
             if patience_left <= 0:
                 break
 
+    return best_state, best_loss, epoch
+
+
+def train_symbol(symbol: str) -> dict:
+    raw = load_prices(symbol)
+    cleaned = clean_prices(raw)
+    prices = cleaned["price"].values.reshape(-1, 1)
+
+    test_idx = int(len(prices) * (1 - TEST_RATIO))
+    val_idx = int(test_idx * (1 - VAL_RATIO))
+
+    # Fit on the full series, not just the train split: assets like gold/BTC
+    # trend strongly over multi-year history, so a train-only range is often
+    # already below the current live price by the time this model serves a
+    # real request — scaling that input above 1.0 pushes it into a range the
+    # LSTM never trained on, producing wild, wrong output right when a forecast
+    # is needed most (during a trend). The mild leakage this adds (the scaler's
+    # min/max reflect the test period too) only affects a linear rescaling, not
+    # anything the model learns to predict.
+    scaler = MinMaxScaler()
+    scaler.fit(prices)
+    scaled = scaler.transform(prices)
+
+    X, y = make_sequences(scaled.flatten(), SEQ_LEN, MAX_HORIZON)
+    train_end = val_idx - SEQ_LEN
+    val_end = test_idx - SEQ_LEN
+
+    X_train, y_train = X[:train_end], y[:train_end]
+    X_val, y_val = X[train_end:val_end], y[train_end:val_end]
+    X_test, y_test = X[val_end:], y[val_end:]
+
+    train_ds = TensorDataset(
+        torch.tensor(X_train, dtype=torch.float32).unsqueeze(-1),
+        torch.tensor(y_train, dtype=torch.float32),
+    )
+    train_loader = DataLoader(train_ds, batch_size=BATCH_SIZE, shuffle=True)
+
+    X_val_t = torch.tensor(X_val, dtype=torch.float32).unsqueeze(-1)
+    y_val_t = torch.tensor(y_val, dtype=torch.float32)
+    X_test_t = torch.tensor(X_test, dtype=torch.float32).unsqueeze(-1)
+
+    best_state, best_val_loss, best_hidden, epochs_ran = None, float("inf"), HIDDEN_SIZE_GRID[0], 0
+    for hidden_size in HIDDEN_SIZE_GRID:
+        state, val_loss, epoch = _train_one_config(hidden_size, train_loader, X_val_t, y_val_t)
+        if val_loss < best_val_loss:
+            best_state, best_val_loss, best_hidden, epochs_ran = state, val_loss, hidden_size, epoch
+
+    model = PriceLSTM(hidden_size=best_hidden)
     model.load_state_dict(best_state)
 
     model.eval()
     with torch.no_grad():
         test_pred_scaled = model(X_test_t).numpy()
 
-    test_pred = scaler.inverse_transform(test_pred_scaled.reshape(-1, 1)).flatten()
-    test_actual = scaler.inverse_transform(y_test.reshape(-1, 1)).flatten()
+    test_pred = scaler.inverse_transform(test_pred_scaled.reshape(-1, 1)).reshape(test_pred_scaled.shape)
+    test_actual = scaler.inverse_transform(y_test.reshape(-1, 1)).reshape(y_test.shape)
 
     mae = float(np.mean(np.abs(test_pred - test_actual)))
     rmse = float(np.sqrt(np.mean((test_pred - test_actual) ** 2)))
@@ -108,6 +132,11 @@ def train_symbol(symbol: str) -> dict:
     ARTIFACTS_DIR.mkdir(parents=True, exist_ok=True)
     torch.save(model.state_dict(), ARTIFACTS_DIR / f"{symbol}_lstm.pt")
     joblib.dump(scaler, ARTIFACTS_DIR / f"{symbol}_lstm_scaler.joblib")
+    # hidden_size varies per symbol (whichever HIDDEN_SIZE_GRID candidate won),
+    # so inference needs this to rebuild the same architecture before loading
+    # the state dict.
+    with open(ARTIFACTS_DIR / f"{symbol}_lstm_config.json", "w") as f:
+        json.dump({"hidden_size": best_hidden}, f)
 
     return {
         "mae": mae,
@@ -116,7 +145,8 @@ def train_symbol(symbol: str) -> dict:
         "n_train": len(X_train),
         "n_val": len(X_val),
         "n_test": len(X_test),
-        "epochs_ran": epoch,
+        "epochs_ran": epochs_ran,
+        "chosen_hidden_size": best_hidden,
     }
 
 

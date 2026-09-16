@@ -3,13 +3,18 @@
 import os
 
 from dotenv import load_dotenv
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
+from slowapi import Limiter
+from slowapi.errors import RateLimitExceeded
+from slowapi.util import get_remote_address
 
 from app.data import fetch_crypto, fetch_crypto_coingecko, fetch_crypto_yahoo, fetch_fx, fetch_gold
 from app.data.loader import SYMBOLS, load_prices
-from app.models import train_baseline, train_lstm
+from app.models import ensemble, train_baseline, train_lstm
 from app.models.predict import MODEL_NAMES, forecast
+from app.preprocessing import MAX_HORIZON
 
 load_dotenv()
 
@@ -23,6 +28,24 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Read endpoints (/history, /predict) are limited per caller IP.
+# Fetch/train/refresh endpoints share resources across every visitor
+# (a single GoldAPI quota, one training job, one set of CSV files on disk),
+# so they're limited with a shared "global" key instead of per-IP: an
+# unauthenticated site-wide button has to protect the shared quota/compute
+# from the sum of all visitors, not just throttle each visitor individually.
+limiter = Limiter(key_func=get_remote_address)
+app.state.limiter = limiter
+
+
+def _global_key(request: Request) -> str:
+    return "global"
+
+
+@app.exception_handler(RateLimitExceeded)
+def _rate_limit_handler(request: Request, exc: RateLimitExceeded) -> JSONResponse:
+    return JSONResponse(status_code=429, content={"detail": f"Rate limit exceeded: {exc.detail}"})
 
 
 def _validate_symbol(symbol: str) -> str:
@@ -51,7 +74,8 @@ def health():
 
 
 @app.get("/history/{symbol}")
-def history(symbol: str, days: int = 90):
+@limiter.limit("30/minute")
+def history(request: Request, symbol: str, days: int = 90):
     symbol = _validate_symbol(symbol)
     try:
         df = load_prices(symbol).tail(days)
@@ -67,11 +91,12 @@ def history(symbol: str, days: int = 90):
 
 
 @app.get("/predict/{symbol}")
-def predict(symbol: str, model: str = "random_forest", horizon: int = 7):
+@limiter.limit("20/minute")
+def predict(request: Request, symbol: str, model: str = "random_forest", horizon: int = 7):
     symbol = _validate_symbol(symbol)
     model = _validate_model(model)
-    if not 1 <= horizon <= 30:
-        raise HTTPException(status_code=400, detail="horizon must be between 1 and 30")
+    if not 1 <= horizon <= MAX_HORIZON:
+        raise HTTPException(status_code=400, detail=f"horizon must be between 1 and {MAX_HORIZON}")
 
     try:
         predictions = forecast(symbol, model_name=model, horizon=horizon)
@@ -82,7 +107,8 @@ def predict(symbol: str, model: str = "random_forest", horizon: int = 7):
 
 
 @app.post("/data/fetch-crypto")
-def fetch_crypto_data(days: int = 365):
+@limiter.limit("10/hour", key_func=_global_key)
+def fetch_crypto_data(request: Request, days: int = 365):
     days = _validate_days(days)
     try:
         for symbol in fetch_crypto.TRADING_PAIRS:
@@ -93,7 +119,8 @@ def fetch_crypto_data(days: int = 365):
 
 
 @app.post("/data/fetch-gold")
-def fetch_gold_data(days: int = 365):
+@limiter.limit("10/hour", key_func=_global_key)
+def fetch_gold_data(request: Request, days: int = 365):
     days = _validate_days(days)
     try:
         fetch_gold.save_gold_history(days=days)
@@ -103,17 +130,20 @@ def fetch_gold_data(days: int = 365):
 
 
 @app.post("/data/train")
-def train_models():
+@limiter.limit("2/hour", key_func=_global_key)
+def train_models(request: Request):
     try:
         train_baseline.main()
         train_lstm.main()
+        ensemble.compute_weights()
     except Exception as exc:
         raise HTTPException(status_code=502, detail=f"Training failed: {exc}") from exc
     return {"status": "ok"}
 
 
 @app.post("/data/refresh-gold-price")
-def refresh_gold_price(days: int = 365):
+@limiter.limit("3/day", key_func=_global_key)
+def refresh_gold_price(request: Request, days: int = 365):
     days = _validate_days(days)
     try:
         result = fetch_gold.save_goldapi_history(days=days)
@@ -123,7 +153,8 @@ def refresh_gold_price(days: int = 365):
 
 
 @app.post("/data/refresh-crypto-coingecko")
-def refresh_crypto_coingecko(days: int = 365):
+@limiter.limit("10/hour", key_func=_global_key)
+def refresh_crypto_coingecko(request: Request, days: int = 365):
     days = _validate_days(days)
     try:
         latest = {}
@@ -137,7 +168,8 @@ def refresh_crypto_coingecko(days: int = 365):
 
 
 @app.post("/data/refresh-crypto-yahoo")
-def refresh_crypto_yahoo(days: int = 365):
+@limiter.limit("10/hour", key_func=_global_key)
+def refresh_crypto_yahoo(request: Request, days: int = 365):
     days = _validate_days(days)
     try:
         latest = {}
@@ -151,7 +183,8 @@ def refresh_crypto_yahoo(days: int = 365):
 
 
 @app.post("/data/refresh-fx-rate")
-def refresh_fx_rate():
+@limiter.limit("20/hour", key_func=_global_key)
+def refresh_fx_rate(request: Request):
     try:
         latest = fetch_fx.save_usd_vnd_rate()
     except Exception as exc:

@@ -3,6 +3,8 @@
 import torch
 from torch import nn
 
+from app.preprocessing import MAX_HORIZON
+
 SEQ_LEN = 30
 
 
@@ -16,9 +18,12 @@ class PriceLSTM(nn.Module):
             batch_first=True,
             dropout=0.2 if num_layers > 1 else 0.0,
         )
-        self.head = nn.Linear(hidden_size, 1)
+        # Predicts all MAX_HORIZON future days in one forward pass instead of one
+        # day at a time, so the forecast doesn't feed predicted days back in as
+        # input for the next (which compounds error the further out it goes).
+        self.head = nn.Linear(hidden_size, MAX_HORIZON)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         out, _ = self.lstm(x)
         last_step = out[:, -1, :]
-        return self.head(last_step).squeeze(-1)
+        return self.head(last_step)

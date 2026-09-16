@@ -13,6 +13,13 @@ COINGECKO_BASE = "https://api.coingecko.com/api/v3"
 # python-requests user agent, so a browser-like one is required.
 HEADERS = {"User-Agent": "Mozilla/5.0"}
 
+# The free/public API 401s on any request older than this, regardless of API
+# key: "Public API users are limited to querying historical data within the
+# past 365 days." Clamp instead of erroring, since this is a reference-only
+# source and 365 days of comparison data is still useful even when the
+# primary Binance fetch is set to a longer range.
+COINGECKO_MAX_DAYS = 365
+
 COIN_IDS = {
     "btc": "bitcoin",
     "eth": "ethereum",
@@ -21,6 +28,7 @@ COIN_IDS = {
 
 
 def fetch_coin_history(coin_id: str, vs_currency: str = "usd", days: int = 365) -> pd.DataFrame:
+    days = min(days, COINGECKO_MAX_DAYS)
     url = f"{COINGECKO_BASE}/coins/{coin_id}/market_chart"
     params = {"vs_currency": vs_currency, "days": days, "interval": "daily"}
     resp = requests.get(url, params=params, headers=HEADERS, timeout=30)

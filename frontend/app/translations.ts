@@ -63,16 +63,37 @@ export const SYMBOLS: Record<Lang, { value: string; label: string }[]> = {
   ],
 };
 
+// The admin/data-management page fetches every crypto symbol together in one
+// call (see fetch_crypto.py's TRADING_PAIRS) — there's no per-coin fetch — so
+// its asset picker only needs Gold vs. Crypto, not one option per coin.
+export function fetchAssetOptions(lang: Lang): { value: string; label: string }[] {
+  const goldOption = SYMBOLS[lang].find((s) => s.value === "gold")!;
+  return [goldOption, { value: "crypto", label: "Crypto" }];
+}
+
+// Which coins "Crypto" covers, shown as a note next to the picker instead of
+// packed into the option label. Derived from SYMBOLS instead of hardcoded,
+// so adding a new coin there (already required for the main page's per-coin
+// picker) updates this note too, with no second place to remember to edit.
+export function cryptoTickersLabel(lang: Lang): string {
+  return SYMBOLS[lang]
+    .filter((s) => s.value !== "gold")
+    .map((s) => s.value.toUpperCase())
+    .join(", ");
+}
+
 export const MODELS: Record<Lang, { value: string; label: string }[]> = {
   vi: [
     { value: "linear", label: "Linear Regression" },
     { value: "random_forest", label: "Random Forest" },
     { value: "lstm", label: "LSTM" },
+    { value: "ensemble", label: "Ensemble (kết hợp)" },
   ],
   en: [
     { value: "linear", label: "Linear Regression" },
     { value: "random_forest", label: "Random Forest" },
     { value: "lstm", label: "LSTM" },
+    { value: "ensemble", label: "Ensemble" },
   ],
 };
 
@@ -83,6 +104,8 @@ export const MODEL_NOTES: Record<Lang, Record<string, string>> = {
     random_forest:
       "Random Forest: kết hợp nhiều cây quyết định trên cùng bộ đặc trưng với Linear Regression, thường chính xác hơn nhờ bắt được quan hệ phi tuyến.",
     lstm: "LSTM: mạng nơ-ron học trực tiếp từ chuỗi 30 ngày giá gần nhất, phù hợp với biến động phức tạp theo thời gian nhưng cần huấn luyện lâu hơn.",
+    ensemble:
+      "Ensemble: kết hợp Linear Regression + Random Forest + LSTM, mỗi model được cân theo độ chính xác thực tế của nó trên tập kiểm tra — thường ổn định hơn từng model riêng lẻ.",
   },
   en: {
     linear:
@@ -90,11 +113,46 @@ export const MODEL_NOTES: Record<Lang, Record<string, string>> = {
     random_forest:
       "Random Forest: combines many decision trees on the same features as Linear Regression; usually more accurate since it captures non-linear patterns.",
     lstm: "LSTM: a neural network that learns directly from the last 30 days of prices; good for complex time patterns but takes longer to train.",
+    ensemble:
+      "Ensemble: blends Linear Regression + Random Forest + LSTM, each weighted by how accurate it actually tested on held-out data — usually steadier than any single model.",
+  },
+};
+
+export interface HowItWorksStep {
+  icon: string;
+  title: string;
+  caption: string;
+}
+
+export const HOW_IT_WORKS: Record<Lang, { title: string; steps: HowItWorksStep[]; note: string }> = {
+  vi: {
+    title: "Cách hoạt động",
+    steps: [
+      { icon: "📥", title: "Lấy dữ liệu giá", caption: "Binance (crypto), Yahoo Finance (vàng)" },
+      { icon: "🧮", title: "Trích xuất đặc trưng", caption: "RSI, MACD, biến động, khối lượng, lag giá" },
+      { icon: "🧠", title: "Huấn luyện model", caption: "Linear · Random Forest · LSTM" },
+      { icon: "⚖️", title: "Ensemble", caption: "Kết hợp 3 model, ưu tiên model chính xác hơn" },
+      { icon: "📈", title: "Dự đoán & vẽ biểu đồ", caption: "Toàn bộ số ngày trong 1 lần, không lặp từng ngày" },
+    ],
+    note: "Chỉ mang tính tham khảo — không phải lời khuyên đầu tư. Xem cảnh báo rủi ro ở trang chính.",
+  },
+  en: {
+    title: "How it works",
+    steps: [
+      { icon: "📥", title: "Fetch price data", caption: "Binance (crypto), Yahoo Finance (gold)" },
+      { icon: "🧮", title: "Build features", caption: "RSI, MACD, volatility, volume, price lags" },
+      { icon: "🧠", title: "Train models", caption: "Linear · Random Forest · LSTM" },
+      { icon: "⚖️", title: "Ensemble", caption: "Blends all 3, leaning on the more accurate one" },
+      { icon: "📈", title: "Predict & chart", caption: "The whole horizon in one pass, no day-by-day loop" },
+    ],
+    note: "For informational purposes only — not investment advice. See the risk warning on the dashboard.",
   },
 };
 
 export interface TextDict {
   subtitle: string;
+  disclaimer: string;
+  howItWorksLink: string;
   fetchNote: string;
   fetchCryptoButton: string;
   fetchCryptoLoading: string;
@@ -150,6 +208,9 @@ export const TEXT: Record<Lang, TextDict> = {
   vi: {
     subtitle:
       "Dự đoán giá BTC / ETH / UNI / Vàng bằng Machine Learning. Chỉ mang tính tham khảo, không phải lời khuyên đầu tư.",
+    disclaimer:
+      "Cảnh báo rủi ro: Đây là công cụ dự đoán giá bằng Machine Learning, chỉ nhằm mục đích tham khảo và giáo dục — KHÔNG phải lời khuyên đầu tư hay tài chính. Giá tiền mã hóa, vàng biến động mạnh và kết quả dự đoán của mô hình có thể sai lệch đáng kể so với thực tế. Bạn tự chịu trách nhiệm với mọi quyết định đầu tư dựa trên thông tin này.",
+    howItWorksLink: "Cách hoạt động",
     fetchNote:
       "Lấy lịch sử giá mới nhất — nguồn dữ liệu chính dùng để huấn luyện model. Cần bấm ít nhất 1 lần trước khi huấn luyện.",
     fetchCryptoButton: "Tải dữ liệu Crypto (Binance)",
@@ -192,7 +253,7 @@ export const TEXT: Record<Lang, TextDict> = {
     coingeckoButton: "Cập nhật từ CoinGecko",
     coingeckoButtonLoading: "Đang cập nhật...",
     coingeckoNote:
-      "Lấy giá BTC/ETH/UNI tham khảo từ các nguồn khác, mỗi nguồn lưu 1 file riêng (vd: btc_coingecko.csv, btc_yahoo_finance.csv) để so sánh với nguồn chính từ Binance (btc_binance.csv) — không ảnh hưởng biểu đồ hay model.",
+      "Lấy giá BTC/ETH/UNI tham khảo từ các nguồn khác, mỗi nguồn lưu 1 file riêng (vd: btc_coingecko.csv, btc_yahoo_finance.csv) để so sánh với nguồn chính từ Binance (btc_binance.csv) — không ảnh hưởng biểu đồ hay model. CoinGecko (bản miễn phí) chỉ cho lấy tối đa 365 ngày gần nhất, dù bạn chọn khoảng lịch sử dài hơn ở trên.",
     coingeckoErrorFallback: "Không cập nhật được giá từ CoinGecko.",
     coingeckoResultLabel: "Giá CoinGecko mới nhất",
     yahooButton: "Cập nhật từ Yahoo Finance",
@@ -207,6 +268,9 @@ export const TEXT: Record<Lang, TextDict> = {
   en: {
     subtitle:
       "BTC / ETH / UNI / Gold price prediction using Machine Learning. For informational purposes only — not investment advice.",
+    disclaimer:
+      "Risk warning: This is a Machine Learning price prediction tool for informational and educational purposes only — it is NOT financial or investment advice. Crypto and gold prices are highly volatile, and model predictions can differ significantly from actual outcomes. You are solely responsible for any investment decisions made using this information.",
+    howItWorksLink: "How it works",
     fetchNote:
       "Fetches the latest price history — the primary data used to train models. Run this at least once before training.",
     fetchCryptoButton: "Fetch crypto data (Binance)",
@@ -249,7 +313,7 @@ export const TEXT: Record<Lang, TextDict> = {
     coingeckoButton: "Update from CoinGecko",
     coingeckoButtonLoading: "Updating...",
     coingeckoNote:
-      "Fetches BTC/ETH/UNI reference prices from other sources, each saved to its own file (e.g. btc_coingecko.csv, btc_yahoo_finance.csv) to compare against the main Binance data (btc_binance.csv) — doesn't affect the chart or models.",
+      "Fetches BTC/ETH/UNI reference prices from other sources, each saved to its own file (e.g. btc_coingecko.csv, btc_yahoo_finance.csv) to compare against the main Binance data (btc_binance.csv) — doesn't affect the chart or models. CoinGecko's free tier only allows the last 365 days, even if you pick a longer range above.",
     coingeckoErrorFallback: "Failed to update the CoinGecko price.",
     coingeckoResultLabel: "Latest CoinGecko price",
     yahooButton: "Update from Yahoo Finance",

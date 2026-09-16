@@ -6,5 +6,6 @@ requests
 scikit-learn
 matplotlib
 python-dotenv
+slowapi
 # CPU-only build (smaller download): pip install torch --index-url https://download.pytorch.org/whl/cpu
 torch

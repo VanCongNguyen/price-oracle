@@ -7,8 +7,8 @@ running, and rebranding the app — no coding required for basic setup.
 
 A price-prediction dashboard for BTC, ETH, UNI, and gold. It fetches
 price history from free public APIs, trains three ML models per asset
-(Linear Regression, Random Forest, LSTM), and serves predictions through
-a web dashboard.
+(Linear Regression, Random Forest, LSTM) plus an accuracy-weighted
+ensemble of the three, and serves predictions through a web dashboard.
 
 **Important:** the predictions are informational only, not financial
 advice — see the disclaimer already built into the app, and `LICENSE.md`
@@ -29,9 +29,12 @@ docker compose up --build
 ```
 
 This starts the backend on `http://localhost:8000` and the frontend on
-`http://localhost:3000`. Open the frontend, click **"Fetch data & train
-models"** once (takes a few minutes the first time), and the dashboard
-will populate.
+`http://localhost:3000`. Open `http://localhost:3000/admin` — a data
+management page, deliberately not linked from the public dashboard — and
+click the **"Fetch"** button(s) followed by **"Train models"** once (takes
+a few minutes the first time). Then open `http://localhost:3000` and the
+public dashboard will show the chart. A "How it works" link on the
+dashboard explains the app to visitors — no setup needed for that page.
 
 ## 3. Rebrand it
 
@@ -48,8 +51,10 @@ needed.
 To change the favicon, replace `frontend/app/favicon.ico` with your own
 `.ico` file of the same name.
 
-To change colors or layout, edit `frontend/app/page.tsx` (Chakra UI
-components) — see `CLAUDE.md` for a map of the codebase if you or your
+To change colors or layout, edit `frontend/app/page.tsx` (the public
+dashboard), `frontend/app/admin/page.tsx` (data management), or
+`frontend/app/how-it-works/page.tsx` (the explainer page) — all Chakra UI
+components. See `CLAUDE.md` for a map of the codebase if you or your
 developer need to go deeper.
 
 ## 4. Optional: more accurate gold data
@@ -80,8 +85,14 @@ front of real customers:
   domain(s) (comma-separated). It defaults to `*` (any origin), which is
   fine for local dev but should be restricted before going live.
 - Decide how often to refresh data automatically (e.g. a scheduled job
-  calling `POST /data/refresh`) instead of relying on someone clicking
-  the button.
+  calling `POST /data/fetch-crypto` / `POST /data/fetch-gold` /
+  `POST /data/train`) instead of relying on someone clicking the buttons.
+- The fetch/train/refresh buttons are already rate-limited (shared across
+  all visitors, since they hit scarce API quotas and shared compute — see
+  `CLAUDE.md`'s API section for the exact limits). That prevents accidental
+  abuse but isn't real authentication; if you want to fully restrict who
+  can trigger them, put the `/data/*` routes behind an auth proxy or add
+  an API-key check in `backend/app/main.py`.
 
 ## 6. Language
 
