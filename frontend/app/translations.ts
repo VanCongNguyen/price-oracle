@@ -193,6 +193,13 @@ export interface TextDict {
   fxRateLabel: (rate: number, date: string) => string;
   goldApiDaysFetchedLabel: (days: number) => string;
   fetchRangeLabel: string;
+  predictionHistoryTitle: string;
+  predictionHistoryEmpty: string;
+  predictionHistoryErrorFallback: string;
+  predictionHistoryDateCol: string;
+  predictionHistoryPredictedCol: string;
+  predictionHistoryActualCol: string;
+  predictionHistoryErrorCol: string;
   fetchRangeOptionLabel: (years: number) => string;
   goldApiRequestsNote: (requests: number) => string;
   chartActualLabel: string;
@@ -264,6 +271,13 @@ export const TEXT: Record<Lang, TextDict> = {
     currencyLabel: "Tiền tệ",
     fxErrorFallback: "Không lấy được tỷ giá USD/VND.",
     fxRateLabel: (rate, date) => `Tỷ giá: 1 USD = ${rate.toLocaleString()} VND (${date})`,
+    predictionHistoryTitle: "Lịch sử dự đoán so với thực tế",
+    predictionHistoryEmpty: "Chưa có dự đoán nào đủ cũ để so sánh với giá thực tế.",
+    predictionHistoryErrorFallback: "Không tải được lịch sử dự đoán.",
+    predictionHistoryDateCol: "Ngày",
+    predictionHistoryPredictedCol: "Đã dự đoán",
+    predictionHistoryActualCol: "Thực tế",
+    predictionHistoryErrorCol: "Sai số",
   },
   en: {
     subtitle:
@@ -324,5 +338,12 @@ export const TEXT: Record<Lang, TextDict> = {
     currencyLabel: "Currency",
     fxErrorFallback: "Failed to fetch the USD/VND exchange rate.",
     fxRateLabel: (rate, date) => `Rate: 1 USD = ${rate.toLocaleString()} VND (${date})`,
+    predictionHistoryTitle: "Prediction history vs. actual",
+    predictionHistoryEmpty: "No predictions old enough yet to compare against actual prices.",
+    predictionHistoryErrorFallback: "Failed to load prediction history.",
+    predictionHistoryDateCol: "Date",
+    predictionHistoryPredictedCol: "Predicted",
+    predictionHistoryActualCol: "Actual",
+    predictionHistoryErrorCol: "Error",
   },
 };

@@ -10,7 +10,7 @@ from slowapi import Limiter
 from slowapi.errors import RateLimitExceeded
 from slowapi.util import get_remote_address
 
-from app.data import fetch_crypto, fetch_crypto_coingecko, fetch_crypto_yahoo, fetch_fx, fetch_gold
+from app.data import fetch_crypto, fetch_crypto_coingecko, fetch_crypto_yahoo, fetch_fx, fetch_gold, prediction_log
 from app.data.loader import SYMBOLS, load_prices
 from app.models import ensemble, train_baseline, train_lstm
 from app.models.predict import MODEL_NAMES, forecast
@@ -103,7 +103,29 @@ def predict(request: Request, symbol: str, model: str = "random_forest", horizon
     except FileNotFoundError as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
 
+    try:
+        prediction_log.log_prediction(symbol, model, predictions)
+    except Exception as exc:
+        # Logging is best-effort: a disk/permissions issue here shouldn't
+        # stop the caller from getting their forecast.
+        print(f"Warning: failed to log prediction for {symbol}/{model}: {exc}")
+
     return {"symbol": symbol, "model": model, "horizon": horizon, "predictions": predictions}
+
+
+@app.get("/predict-history/{symbol}")
+@limiter.limit("30/minute")
+def predict_history(request: Request, symbol: str, model: str | None = None):
+    symbol = _validate_symbol(symbol)
+    if model is not None:
+        model = _validate_model(model)
+
+    try:
+        comparisons = prediction_log.compare_with_actual(symbol, model)
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+
+    return {"symbol": symbol, "model": model, "comparisons": comparisons}
 
 
 @app.post("/data/fetch-crypto")

@@ -10,6 +10,7 @@ import {
   Input,
   Spinner,
   SimpleGrid,
+  Table,
   Tooltip,
 } from "@chakra-ui/react";
 import Link from "next/link";
@@ -39,6 +40,15 @@ interface PredictionPoint {
   price: number;
 }
 
+interface PredictionComparison {
+  logged_date: string;
+  target_date: string;
+  model: string;
+  predicted_price: number;
+  actual_price: number;
+  error_pct: number;
+}
+
 export default function Home() {
   const [lang, setLang] = useState<Lang>("en");
   const [symbol, setSymbol] = useState("gold");
@@ -50,6 +60,9 @@ export default function Home() {
   const [predictions, setPredictions] = useState<PredictionPoint[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+
+  const [predictionHistory, setPredictionHistory] = useState<PredictionComparison[]>([]);
+  const [predictionHistoryError, setPredictionHistoryError] = useState("");
 
   const [goldUnit, setGoldUnit] = useState<GoldUnit>("oz");
   const [currency, setCurrency] = useState<"USD" | "VND">("USD");
@@ -118,6 +131,32 @@ export default function Home() {
       cancelled = true;
     };
   }, [symbol, model, horizon, historyDays]);
+
+  useEffect(() => {
+    let cancelled = false;
+    async function loadPredictionHistory() {
+      setPredictionHistoryError("");
+      try {
+        const res = await fetch(`${API_BASE}/predict-history/${symbol}?model=${model}`);
+        const body = await res.json().catch(() => null);
+        if (!res.ok) {
+          throw new Error(body?.detail ?? t.predictionHistoryErrorFallback);
+        }
+        if (!cancelled) {
+          setPredictionHistory(body.comparisons);
+        }
+      } catch (e) {
+        if (!cancelled) {
+          setPredictionHistoryError(e instanceof Error ? e.message : t.genericErrorFallback);
+          setPredictionHistory([]);
+        }
+      }
+    }
+    loadPredictionHistory();
+    return () => {
+      cancelled = true;
+    };
+  }, [symbol, model]);
 
   async function handleSwitchToVnd() {
     setFxRefreshing(true);
@@ -382,6 +421,45 @@ export default function Home() {
           </NativeSelect.Root>
         </Box>
       </Flex>
+
+      <Box mt={6}>
+        <Text fontWeight="semibold" mb={2}>
+          {t.predictionHistoryTitle}
+        </Text>
+        {predictionHistoryError && <Text color="red.500">{predictionHistoryError}</Text>}
+        {!predictionHistoryError && predictionHistory.length === 0 && (
+          <Text color="gray.500" fontSize="sm">
+            {t.predictionHistoryEmpty}
+          </Text>
+        )}
+        {!predictionHistoryError && predictionHistory.length > 0 && (
+          <Box overflowX="auto">
+            <Table.Root size="sm" maxW="480px">
+              <Table.Header>
+                <Table.Row>
+                  <Table.ColumnHeader>{t.predictionHistoryDateCol}</Table.ColumnHeader>
+                  <Table.ColumnHeader>{t.predictionHistoryPredictedCol}</Table.ColumnHeader>
+                  <Table.ColumnHeader>{t.predictionHistoryActualCol}</Table.ColumnHeader>
+                  <Table.ColumnHeader>{t.predictionHistoryErrorCol}</Table.ColumnHeader>
+                </Table.Row>
+              </Table.Header>
+              <Table.Body>
+                {predictionHistory.slice(0, 20).map((row) => (
+                  <Table.Row key={row.target_date}>
+                    <Table.Cell>{row.target_date}</Table.Cell>
+                    <Table.Cell>{(row.predicted_price * unitFactor).toLocaleString()}</Table.Cell>
+                    <Table.Cell>{(row.actual_price * unitFactor).toLocaleString()}</Table.Cell>
+                    <Table.Cell color={Math.abs(row.error_pct) <= 5 ? "green.600" : "red.600"}>
+                      {row.error_pct >= 0 ? "+" : ""}
+                      {row.error_pct.toFixed(2)}%
+                    </Table.Cell>
+                  </Table.Row>
+                ))}
+              </Table.Body>
+            </Table.Root>
+          </Box>
+        )}
+      </Box>
     </Box>
   );
 }
